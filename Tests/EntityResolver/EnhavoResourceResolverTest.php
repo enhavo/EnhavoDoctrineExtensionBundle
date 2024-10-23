@@ -11,26 +11,29 @@ namespace Enhavo\Bundle\DoctrineExtensionBundle\Tests\EntityResolver;
 use Closure;
 use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\Proxy\Proxy;
-use Enhavo\Bundle\DoctrineExtensionBundle\EntityResolver\SyliusResourceResolver;
+use Enhavo\Bundle\DoctrineExtensionBundle\EntityResolver\EnhavoResourceResolver;
 use Enhavo\Bundle\DoctrineExtensionBundle\Exception\ResolveException;
+use Enhavo\Bundle\ResourceBundle\Resource\ResourceManager;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
-class SyliusResourceResolverTest extends TestCase
+class EnhavoResourceResolverTest extends TestCase
 {
     private function createDependencies()
     {
-        $dependencies = new SyliusResourceResolverDependencies();
+        $dependencies = new EnhavoResourceResolverDependencies();
         $dependencies->repository = $this->getMockBuilder(EntityRepository::class)->disableOriginalConstructor()->getMock();
-        $dependencies->container = $this->getMockBuilder(ContainerInterface::class)->getMock();
+        $dependencies->resourceManager = $this->getMockBuilder(ResourceManager::class)->disableOriginalConstructor()->getMock();
         $dependencies->resources = [];
         return $dependencies;
     }
 
-    private function createInstance(SyliusResourceResolverDependencies $dependencies)
+    private function createInstance(EnhavoResourceResolverDependencies $dependencies)
     {
-        $instance = new SyliusResourceResolver($dependencies->resources);
-        $instance->setContainer($dependencies->container);
+        $instance = new EnhavoResourceResolver(
+            $dependencies->resources,
+            $dependencies->resourceManager
+        );
         return $instance;
     }
 
@@ -41,16 +44,16 @@ class SyliusResourceResolverTest extends TestCase
         $dependencies->resources = [
             'app.entity' => [
                 'classes' => [
-                    'model' => SyliusResourceResolverEntityDummy::class
+                    'model' => EnhavoResourceResolverEntityDummy::class
                 ]
             ]
         ];
 
         $resolver = $this->createInstance($dependencies);
 
-        $this->assertEquals('app.entity', $resolver->getName(new SyliusResourceResolverEntityDummy));
-        $this->assertEquals('app.entity', $resolver->getName(new SyliusResourceResolverEntityProxyDummy));
-        $this->assertEquals('app.entity', $resolver->getName(SyliusResourceResolverEntityDummy::class));
+        $this->assertEquals('app.entity', $resolver->getName(new EnhavoResourceResolverEntityDummy));
+        $this->assertEquals('app.entity', $resolver->getName(new EnhavoResourceResolverEntityProxyDummy));
+        $this->assertEquals('app.entity', $resolver->getName(EnhavoResourceResolverEntityDummy::class));
     }
 
     public function testGetNameException()
@@ -59,17 +62,17 @@ class SyliusResourceResolverTest extends TestCase
         $dependencies = $this->createDependencies();
         $dependencies->resources = [];
         $resolver = $this->createInstance($dependencies);
-        $resolver->getName(new SyliusResourceResolverEntityDummy);
+        $resolver->getName(new EnhavoResourceResolverEntityDummy);
     }
 
     public function testGetEntity()
     {
-        $entity = new SyliusResourceResolverEntityDummy();
+        $entity = new EnhavoResourceResolverEntityDummy();
 
         $dependencies = $this->createDependencies();
         $dependencies->repository->method('find')->willReturn($entity);
-        $dependencies->container->method('get')->willReturnCallback(function($service) use ($dependencies) {
-            if($service == 'app.repository.entity') {
+        $dependencies->resourceManager->method('getRepository')->willReturnCallback(function($service) use ($dependencies) {
+            if ($service == 'app.entity') {
                 return $dependencies->repository;
             }
             return null;
@@ -78,7 +81,7 @@ class SyliusResourceResolverTest extends TestCase
         $dependencies->resources = [
             'app.entity' => [
                 'classes' => [
-                    'model' => SyliusResourceResolverEntityDummy::class
+                    'model' => EnhavoResourceResolverEntityDummy::class
                 ]
             ]
         ];
@@ -96,21 +99,19 @@ class SyliusResourceResolverTest extends TestCase
     }
 }
 
-class SyliusResourceResolverDependencies
+class EnhavoResourceResolverDependencies
 {
-    /** @var EntityRepository|\PHPUnit_Framework_MockObject_MockObject */
-    public $repository;
-    /** @var ContainerInterface|\PHPUnit_Framework_MockObject_MockObject */
-    public $container;
+    public EntityRepository|MockObject $repository;
+    public ResourceManager|MockObject $resourceManager;
     public $resources;
 }
 
-class  SyliusResourceResolverEntityDummy
+class  EnhavoResourceResolverEntityDummy
 {
 
 }
 
-class SyliusResourceResolverEntityProxyDummy extends SyliusResourceResolverEntityDummy implements Proxy
+class EnhavoResourceResolverEntityProxyDummy extends EnhavoResourceResolverEntityDummy implements Proxy
 {
     public function __setInitialized($initialized)
     {
